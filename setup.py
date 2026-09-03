@@ -2,7 +2,7 @@
 Setup and Packaging Configuration for Clara.
 
 This module manages the installation, metadata specification, dependency
-resolution, and CLI entry-point configuration for the Clara backend package.
+resolution, and configuration for the Clara backend package.
 
 It acts as a standard setuptools-compatible setup script mirroring the
 metadata and build configurations defined in `pyproject.toml`, ensuring seamless
