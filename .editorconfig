@@ -1,0 +1,70 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+root = true
+
+# Global settings for all files
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Python files
+[*.py]
+indent_style = space
+indent_size = 4
+max_line_length = 88
+quote_type = single
+
+# Yaml files
+[*.{yaml,yml}]
+indent_style = space
+indent_size = 2
+max_line_length = 120
+
+# Markdown files
+[*.md]
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = false
+max_line_length = 120
+
+# Dockerfile
+[Dockerfile]
+indent_style = space
+indent_size = 4
+
+# Shell scripts
+[*.{sh,bash}]
+indent_style = space
+indent_size = 4
+
+# JSON files
+[*.json]
+indent_style = space
+indent_size = 2
+
+# Makefile
+[Makefile]
+indent_style = tab
+indent_size = 4
+
+# Config files
+[*.{cfg,conf,ini}]
+indent_style = space
+indent_size = 4
+
+# Environment files
+[*.env]
+indent_style = space
+indent_size = 4
+
+# Requirements files
+[requirements*.txt]
+indent_style = space
+indent_size = 4
+
+# YAML files with specific indentation for GitHub Actions
+[{.github/workflows/*.yml,.github/workflows/*.yaml}]
+indent_style = space
+indent_size = 2
