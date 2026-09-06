@@ -1,0 +1,22 @@
+# Project ownership and default review assignments
+# Maintained by Aryan Vishwakarma, the owner of this project.
+
+# Default owner for the entire repository
+* @Aryan-202
+
+# Project-level governance and documentation
+README.md @Aryan-202
+CONTRIBUTING.md @Aryan-202
+CODE_OF_CONDUCT.md @Aryan-202
+SECURITY.md @Aryan-202
+CODEOWNERS @Aryan-202
+LICENSE @Aryan-202
+
+# Source code and project configuration
+*.py @Aryan-202
+*.md @Aryan-202
+*.yml @Aryan-202
+*.yaml @Aryan-202
+pyproject.toml @Aryan-202
+requirements.txt @Aryan-202
+setup.py @Aryan-202
