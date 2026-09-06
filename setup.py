@@ -4,11 +4,6 @@ Setup and Packaging Configuration for Clara.
 This module manages the installation, metadata specification, dependency
 resolution, and configuration for the Clara backend package.
 
-It acts as a standard setuptools-compatible setup script mirroring the
-metadata and build configurations defined in `pyproject.toml`, ensuring seamless
-compatibility for environments and workflows that do not natively utilize `uv`
-or modern PEP 517/621-compliant build frontends.
-
 This uses Setuptools (https://setuptools.pypa.io/en/latest/) the standard
 python mechanism for installing packages.
 For the easiest installation just type the command (you'll probably need
@@ -19,9 +14,6 @@ root privileges for that):
 """
 
 import os
-import sys
-from pathlib import Path
-from typing import List, Optional
 
 from setuptools import find_packages, setup
 
