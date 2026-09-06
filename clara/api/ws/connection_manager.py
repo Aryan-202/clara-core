@@ -7,7 +7,7 @@ to all connected clients while automatically cleaning up broken connections.
 """
 
 from fastapi import WebSocket
-from typing import List
+from typing import List, Dict, Any
 
 
 class ConnectionManager:
@@ -44,6 +44,10 @@ class ConnectionManager:
             ValueError: If the connection is not found in the active list.
         """
         self.active_connections.remove(websocket)
+
+    async def send_clara_message(self, message: Dict[str, Any], websocket: WebSocket):
+        """Send a message to a single client."""
+        await websocket.send_json(message)
 
     async def broadcast(self, data: dict):
         """

@@ -7,3 +7,4 @@ setuptools
 flake8
 websockets
 fastapi
+uvicorn

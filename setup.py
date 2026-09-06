@@ -31,6 +31,6 @@ setup(
     version=VERSION,
     author=AUTHOR,
     url=URL,
-    licence=LICENSE,
+    license=LICENSE,
     packages=find_packages(include=["clara*"]),
 )
