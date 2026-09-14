@@ -4,3 +4,7 @@ This module will handle all the crud operations done by ai agent according to us
 All required consent will be taken via Clara mobile app, user needs to agree all terms
 and condition before using this feature of Clara.
 """
+
+
+def send_email() -> None:
+    pass
