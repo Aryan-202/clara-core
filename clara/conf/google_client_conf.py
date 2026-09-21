@@ -9,3 +9,5 @@ from dotenv import load_dotenv
 load_dotenv()
 
 AUTH_URI = os.getenv("AUTH_URI")
+
+SCOPES = ['https://googleapis.com']

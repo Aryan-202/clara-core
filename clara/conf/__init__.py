@@ -1,5 +1,6 @@
-from .google_client_conf import AUTH_URI
+from .google_client_conf import AUTH_URI, SCOPES
 
 __all__ = [
-    "AUTH_URI"
+    "AUTH_URI",
+    "SCOPES"
 ]
