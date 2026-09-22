@@ -31,7 +31,7 @@ def _get_gmail_service():
     return build('gmail', 'v1', credentials=creds)
 
 
-"""crud ops"""
+"""crud ops."""
 
 
 def send_email(
