@@ -1,0 +1,155 @@
+name: email_assistant
+version: "0.1.0"
+display_name: "Email Assistant"
+description: "AI-powered email management assistant for Gmail providing comprehensive drafting, reading, searching, organizing, and sending capabilities."
+author: "Clara Team"
+category: "Productivity"
+
+triggers:
+  - "email"
+  - "gmail"
+  - "inbox"
+  - "send email"
+  - "send mail"
+  - "check email"
+  - "search email"
+  - "unread emails"
+  - "draft email"
+  - "delete email"
+  - "archive email"
+  - "mail"
+
+connections:
+  - service: google
+    name: gmail
+    required_scopes:
+      - "https://www.googleapis.com/auth/gmail.readonly"
+      - "https://www.googleapis.com/auth/gmail.send"
+      - "https://www.googleapis.com/auth/gmail.modify"
+      - "https://www.googleapis.com/auth/gmail.compose"
+
+tools:
+  - name: send_email
+    description: "Send an email to one or more recipients with optional CC, BCC, subject, body, and attachments."
+    parameters:
+      to:
+        type: string
+        description: "Primary recipient email address or comma-separated list."
+        required: true
+      subject:
+        type: string
+        description: "Subject of the email."
+        required: true
+      body:
+        type: string
+        description: "Body text of the email."
+        required: true
+      cc:
+        type: string
+        description: "CC recipient(s)."
+        required: false
+      bcc:
+        type: string
+        description: "BCC recipient(s)."
+        required: false
+      attachments:
+        type: array
+        description: "List of attachment file paths."
+        required: false
+
+  - name: create_draft
+    description: "Create an email draft without sending."
+    parameters:
+      to:
+        type: string
+        description: "Recipient email address."
+        required: false
+      subject:
+        type: string
+        description: "Email subject line."
+        required: false
+      body:
+        type: string
+        description: "Draft message body."
+        required: true
+
+  - name: update_draft
+    description: "Update an existing email draft's content, recipients, or subject."
+    parameters:
+      draft_id:
+        type: string
+        description: "Unique ID of the draft to update."
+        required: true
+      new_content:
+        type: string
+        description: "New body content."
+        required: true
+      new_recipients:
+        type: string
+        description: "New recipients list."
+        required: false
+      subject:
+        type: string
+        description: "New subject line."
+        required: false
+
+  - name: search_emails
+    description: "Search emails by query text, folder/label, or date range."
+    parameters:
+      query:
+        type: string
+        description: "Search keywords or Gmail query syntax."
+        required: false
+      folder:
+        type: string
+        description: "Target folder or label (e.g., inbox, sent, starred, unread, trash)."
+        required: false
+      limit:
+        type: integer
+        description: "Maximum number of emails to retrieve."
+        default: 10
+        required: false
+
+  - name: get_email_content
+    description: "Get the full body, headers, and attachments metadata of a specific email by its message ID."
+    parameters:
+      message_id:
+        type: string
+        description: "Gmail message ID."
+        required: true
+
+  - name: summarize_thread
+    description: "Fetch and summarize all messages in an email thread."
+    parameters:
+      message_ids:
+        type: string
+        description: "Thread ID or message ID to summarize."
+        required: true
+
+  - name: move_email
+    description: "Move an email to a folder/label such as archive, inbox, trash, spam, or starred."
+    parameters:
+      message_id:
+        type: string
+        description: "Gmail message ID."
+        required: true
+      target_folder:
+        type: string
+        description: "Folder or label name (archive, trash, spam, inbox, etc.)."
+        required: true
+
+  - name: delete_email
+    description: "Trash or permanently delete an email."
+    parameters:
+      message_id:
+        type: string
+        description: "Gmail message ID."
+        required: true
+      permanent:
+        type: boolean
+        description: "If true, permanently delete. If false, move to Trash."
+        default: false
+        required: false
+
+prompt_file: "prompt.md"
+workflow_module: "workflows"
