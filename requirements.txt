@@ -23,3 +23,8 @@ pytest>=9.1.0
 pytest-asyncio>=1.4.0
 httpx>=0.28.0
 flake8>=7.3.0
+
+# Documentation
+sphinx>=7.0.0
+sphinx-rtd-theme>=2.0.0
+myst-parser>=2.0.0

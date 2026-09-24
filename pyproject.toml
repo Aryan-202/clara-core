@@ -21,6 +21,13 @@ dependencies = [
     "langchain-core>=0.3.0",
 ]
 
+[project.optional-dependencies]
+docs = [
+    "sphinx>=7.0.0",
+    "sphinx-rtd-theme>=2.0.0",
+    "myst-parser>=2.0.0",
+]
+
 [project.scripts]
 clara = "clara.main:main"
 
