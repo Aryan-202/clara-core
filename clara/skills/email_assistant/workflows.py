@@ -1,5 +1,4 @@
-"""
-Email Assistant Workflow Module for Clara Core.
+"""Email Assistant Workflow Module for Clara Core.
 
 Implements the cognitive CRUD loop for email management:
 1. Parse Intent (Create, Read, Update, Delete)
@@ -10,7 +9,7 @@ Implements the cognitive CRUD loop for email management:
 """
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from clara.connections.google.gmail import (
     create_draft,
@@ -26,21 +25,44 @@ from clara.connections.google.gmail import (
 
 
 class EmailAssistantWorkflow:
-    """
-    Workflow coordinator for processing natural language email requests.
+    """Workflow coordinator for processing natural language email requests.
+
+    Orchestrates intent classification, entity extraction, safety confirmation
+    guardrails, tool execution against Gmail APIs, and markdown response
+    generation.
+
+    Attributes:
+        service (Optional[Any]): Authenticated Gmail API client service.
+        access_token (Optional[str]): OAuth2 access token for user authentication.
+
+    Example:
+        >>> workflow = EmailAssistantWorkflow(access_token="ya29.a0...")
+        >>> response = workflow.execute("Draft an email to boss@example.com")
+        >>> print(response["reply"])
     """
 
     def __init__(
         self,
         service: Optional[Any] = None,
         access_token: Optional[str] = None,
-    ):
-        self.service = service
-        self.access_token = access_token
+    ) -> None:
+        """Initializes the EmailAssistantWorkflow.
+
+        Args:
+            service (Optional[Any]): Optional pre-initialized Gmail API service.
+            access_token (Optional[str]): Optional OAuth2 access token string.
+        """
+        self.service: Optional[Any] = service
+        self.access_token: Optional[str] = access_token
         if not self.service and self.access_token:
             self.service = _get_gmail_service(access_token=self.access_token)
 
-    def _ensure_service(self):
+    def _ensure_service(self) -> Any:
+        """Ensures that the Gmail API service instance is initialized.
+
+        Returns:
+            Any: The authenticated Gmail service instance.
+        """
         if not self.service:
             self.service = _get_gmail_service(access_token=self.access_token)
         return self.service
@@ -50,15 +72,20 @@ class EmailAssistantWorkflow:
         user_prompt: str,
         context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """
-        Main entry point for executing an email assistant request.
+        """Main entry point for executing an email assistant request.
 
         Args:
-            user_prompt: Natural language user instruction.
-            context: Optional conversation context or previous action state.
+            user_prompt (str): Natural language user instruction.
+            context (Optional[Dict[str, Any]]): Optional conversation context
+                or previous pending action state.
 
         Returns:
-            Dict containing status, action, reply (markdown text), and data.
+            Dict[str, Any]: Execution result containing:
+                - ``status`` (str): 'success', 'pending_confirmation',
+                  'clarification_needed', 'cancelled', or 'error'.
+                - ``action`` (str): Executed action name.
+                - ``reply`` (str): User-facing markdown formatted reply.
+                - ``data`` (Dict[str, Any]): Structured output payload.
         """
         ctx = context or {}
         prompt_clean = user_prompt.strip()
@@ -82,7 +109,16 @@ class EmailAssistantWorkflow:
     def _dispatch_intent(
         self, intent: str, prompt: str, ctx: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Dispatch parsed intent to corresponding handler."""
+        """Dispatches parsed intent to the corresponding action handler.
+
+        Args:
+            intent (str): The parsed intent keyword.
+            prompt (str): The raw user prompt.
+            ctx (Dict[str, Any]): Context dictionary.
+
+        Returns:
+            Dict[str, Any]: Handler response dictionary.
+        """
         handlers = {
             "SEND_EMAIL": self._handle_send_email,
             "CREATE_DRAFT": self._handle_create_draft,
@@ -105,7 +141,14 @@ class EmailAssistantWorkflow:
             }
 
     def _parse_intent(self, prompt: str) -> str:
-        """Identify the CRUD operation from the prompt."""
+        """Identifies the target CRUD operation from the user prompt text.
+
+        Args:
+            prompt (str): Raw or sanitized user prompt text.
+
+        Returns:
+            str: Detected intent identifier (e.g., 'SEND_EMAIL', 'SEARCH_EMAILS').
+        """
         p = prompt.lower()
 
         delete_kw = [
@@ -160,7 +203,14 @@ class EmailAssistantWorkflow:
         return self._parse_intent_fallback(p)
 
     def _parse_intent_fallback(self, p: str) -> str:
-        """Secondary fallback check for single keyword intents."""
+        """Secondary heuristic check for single keyword intents.
+
+        Args:
+            p (str): Lowercased prompt string.
+
+        Returns:
+            str: Fallback intent name.
+        """
         if "delete" in p or "trash" in p:
             return "DELETE_EMAIL"
         if "draft" in p:
@@ -174,6 +224,14 @@ class EmailAssistantWorkflow:
         return "UNKNOWN"
 
     def _is_confirmation(self, text: str) -> bool:
+        """Checks if user input represents positive confirmation.
+
+        Args:
+            text (str): Input text.
+
+        Returns:
+            bool: True if affirmative, False otherwise.
+        """
         t = text.lower()
         affirmative = [
             "yes", "confirm", "proceed", "sure",
@@ -182,18 +240,41 @@ class EmailAssistantWorkflow:
         return t in affirmative
 
     def _is_cancellation(self, text: str) -> bool:
+        """Checks if user input represents a cancellation command.
+
+        Args:
+            text (str): Input text.
+
+        Returns:
+            bool: True if cancellation, False otherwise.
+        """
         t = text.lower()
         return t in ["no", "cancel", "stop", "abort", "don't", "do not"]
 
     def _extract_email_address(self, text: str) -> List[str]:
-        """Extract email addresses from text."""
+        """Extracts email addresses from arbitrary text using regex.
+
+        Args:
+            text (str): Input text to scan.
+
+        Returns:
+            List[str]: List of valid email addresses detected.
+        """
         email_pattern = r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"
         return re.findall(email_pattern, text)
 
     def _extract_quoted_or_pattern(
         self, text: str, label: str
     ) -> Optional[str]:
-        """Extract content after label like 'subject: ...' or 'body: ...'."""
+        """Extracts content following a labelled pattern (e.g. 'subject: ...').
+
+        Args:
+            text (str): Input text.
+            label (str): Key label name to look for.
+
+        Returns:
+            Optional[str]: Extracted value if matched, otherwise None.
+        """
         pattern = rf"{label}\s*:\s*([^,\n]+)"
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
@@ -202,8 +283,16 @@ class EmailAssistantWorkflow:
 
     def _extract_subject_body(
         self, prompt: str, ctx: Dict[str, Any]
-    ) -> tuple[str, str]:
-        """Extract subject and body from prompt and context."""
+    ) -> Tuple[str, str]:
+        """Extracts subject and body content from prompt and context.
+
+        Args:
+            prompt (str): Prompt text.
+            ctx (Dict[str, Any]): Context dictionary.
+
+        Returns:
+            Tuple[str, str]: Extracted (subject, body) pair.
+        """
         subject = (
             self._extract_quoted_or_pattern(prompt, "subject")
             or ctx.get("subject", "")
@@ -232,7 +321,15 @@ class EmailAssistantWorkflow:
     def _handle_send_email(
         self, prompt: str, ctx: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Handle drafting and sending emails."""
+        """Handles drafting and sending emails with recipient confirmation checks.
+
+        Args:
+            prompt (str): Prompt text.
+            ctx (Dict[str, Any]): Context dictionary.
+
+        Returns:
+            Dict[str, Any]: Action response dictionary.
+        """
         emails = self._extract_email_address(prompt)
         subject, body = self._extract_subject_body(prompt, ctx)
 
@@ -300,7 +397,15 @@ class EmailAssistantWorkflow:
     def _handle_create_draft(
         self, prompt: str, ctx: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Handle creating drafts."""
+        """Handles creating an email draft.
+
+        Args:
+            prompt (str): Prompt text.
+            ctx (Dict[str, Any]): Context dictionary.
+
+        Returns:
+            Dict[str, Any]: Action response dictionary.
+        """
         emails = self._extract_email_address(prompt)
         subject = self._extract_quoted_or_pattern(prompt, "subject") or "Draft"
         body = self._extract_quoted_or_pattern(prompt, "body") or ""
@@ -344,7 +449,15 @@ class EmailAssistantWorkflow:
     def _handle_update_draft(
         self, prompt: str, ctx: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Handle updating an existing draft."""
+        """Handles modifying an existing email draft.
+
+        Args:
+            prompt (str): Prompt text.
+            ctx (Dict[str, Any]): Context dictionary.
+
+        Returns:
+            Dict[str, Any]: Action response dictionary.
+        """
         draft_id_match = re.search(
             r"draft\s*(?:id)?\s*[:#]?\s*([a-zA-Z0-9_-]+)",
             prompt,
@@ -389,7 +502,15 @@ class EmailAssistantWorkflow:
     def _handle_read_email(
         self, prompt: str, ctx: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Handle retrieving full email content."""
+        """Handles reading a specific email by its ID.
+
+        Args:
+            prompt (str): Prompt text.
+            ctx (Dict[str, Any]): Context dictionary.
+
+        Returns:
+            Dict[str, Any]: Action response dictionary.
+        """
         id_match = re.search(
             r"(?:email|message|id)\s*[:#]?\s*([a-zA-Z0-9_-]{10,})",
             prompt,
@@ -425,7 +546,15 @@ class EmailAssistantWorkflow:
     def _handle_search_emails(
         self, prompt: str, ctx: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Handle searching/listing emails."""
+        """Handles searching or querying emails matching parameters.
+
+        Args:
+            prompt (str): Prompt text.
+            ctx (Dict[str, Any]): Context dictionary.
+
+        Returns:
+            Dict[str, Any]: Action response dictionary.
+        """
         p_lower = prompt.lower()
         folder = None
         for f in ["unread", "starred", "sent", "trash", "inbox"]:
@@ -474,7 +603,15 @@ class EmailAssistantWorkflow:
     def _handle_summarize_thread(
         self, prompt: str, ctx: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Handle thread summarization."""
+        """Handles thread history retrieval and formatting for summarization.
+
+        Args:
+            prompt (str): Prompt text.
+            ctx (Dict[str, Any]): Context dictionary.
+
+        Returns:
+            Dict[str, Any]: Action response dictionary.
+        """
         id_match = re.search(
             r"(?:thread|message|id)\s*[:#]?\s*([a-zA-Z0-9_-]{10,})",
             prompt,
@@ -510,7 +647,15 @@ class EmailAssistantWorkflow:
     def _handle_move_email(
         self, prompt: str, ctx: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Handle archiving or moving email."""
+        """Handles moving or archiving an email message.
+
+        Args:
+            prompt (str): Prompt text.
+            ctx (Dict[str, Any]): Context dictionary.
+
+        Returns:
+            Dict[str, Any]: Action response dictionary.
+        """
         id_match = re.search(
             r"(?:email|message|id)\s*[:#]?\s*([a-zA-Z0-9_-]{10,})",
             prompt,
@@ -548,7 +693,15 @@ class EmailAssistantWorkflow:
     def _handle_delete_email(
         self, prompt: str, ctx: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Handle deleting or trashing an email with safety guardrails."""
+        """Handles moving to Trash or permanently deleting an email with confirmation.
+
+        Args:
+            prompt (str): Prompt text.
+            ctx (Dict[str, Any]): Context dictionary.
+
+        Returns:
+            Dict[str, Any]: Action response dictionary.
+        """
         id_match = re.search(
             r"(?:email|message|id)\s*[:#]?\s*([a-zA-Z0-9_-]{10,})",
             prompt,
@@ -595,7 +748,14 @@ class EmailAssistantWorkflow:
     def _execute_confirmed_action(
         self, pending_action: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Execute a previously held action after user confirmation."""
+        """Executes a previously held action after explicit user confirmation.
+
+        Args:
+            pending_action (Dict[str, Any]): Dictionary describing the deferred action.
+
+        Returns:
+            Dict[str, Any]: Action response dictionary.
+        """
         action_name = pending_action.get("name")
         svc = self._ensure_service()
 
@@ -637,14 +797,21 @@ class EmailAssistantWorkflow:
     def _handle_fallback(
         self, prompt: str, ctx: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Fallback handler when intent is ambiguous."""
+        """Fallback handler providing guidance when intent is ambiguous.
+
+        Args:
+            prompt (str): Prompt text.
+            ctx (Dict[str, Any]): Context dictionary.
+
+        Returns:
+            Dict[str, Any]: Guidance response dictionary.
+        """
         return {
             "status": "clarification_needed",
             "action": "unknown",
             "reply": (
                 "I am Clara's Email Assistant. You can ask me to:\n"
-                "- **Send or draft** emails (`send email to user@example.com "
-                "with subject Hi and body Hello`)\n"
+                "- **Send or draft** emails (`send email to user@example.com`)\n"
                 "- **Search or check** your inbox (`check unread emails`)\n"
                 "- **Read** an email by ID (`read email <id>`)\n"
                 "- **Summarize** a thread (`summarize thread <id>`)\n"
@@ -660,8 +827,20 @@ def handle_email_prompt(
     service: Optional[Any] = None,
     context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """
-    Convenience function to run the Email Assistant workflow on a prompt.
+    """Convenience helper to process a natural language prompt with the Email Assistant.
+
+    Args:
+        user_prompt (str): The natural language instruction from the user.
+        access_token (Optional[str]): Optional OAuth2 bearer token.
+        service (Optional[Any]): Optional pre-authenticated Gmail API client.
+        context (Optional[Dict[str, Any]]): Optional execution context.
+
+    Returns:
+        Dict[str, Any]: Formatted execution results dictionary.
+
+    Example:
+        >>> res = handle_email_prompt("Check my unread emails", access_token="ya29...")
+        >>> print(res["reply"])
     """
     workflow = EmailAssistantWorkflow(
         service=service, access_token=access_token

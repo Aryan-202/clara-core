@@ -1,27 +1,17 @@
-"""
-Google connections module for Clara.
+"""Google Workspace connection adapters for Clara Core.
+
+This package provides service adapters for Google Workspace APIs including:
+- :class:`~clara.connections.google.gmail.GmailConnection`
+- :class:`~clara.connections.google.calendar.CalendarConnection`
+- :class:`~clara.connections.google.drive.DriveConnection`
 """
 
-from clara.connections.google.gmail import (
-    GmailConnection,
-    create_draft,
-    delete_email,
-    get_email_content,
-    move_email,
-    search_emails,
-    send_email,
-    summarize_thread,
-    update_draft,
-)
+from clara.connections.google.calendar import CalendarConnection
+from clara.connections.google.drive import DriveConnection
+from clara.connections.google.gmail import GmailConnection
 
 __all__ = [
+    "CalendarConnection",
+    "DriveConnection",
     "GmailConnection",
-    "send_email",
-    "create_draft",
-    "update_draft",
-    "search_emails",
-    "get_email_content",
-    "summarize_thread",
-    "move_email",
-    "delete_email",
 ]

@@ -1,65 +1,76 @@
-"""
-WebSocket connection manager for FastAPI applications.
+"""WebSocket Connection Lifetime and Broadcast Manager.
 
-This module provides a simple connection manager to handle active WebSocket
-connections, accept new connections, disconnect clients, and broadcast messages
-to all connected clients while automatically cleaning up broken connections.
+This module provides the :class:`ConnectionManager` class to manage active
+WebSocket client connections, connection handshakes, disconnections, and
+concurrent message broadcasting with automatic stale connection pruning.
 """
 
+from typing import Any, Dict, List
 from fastapi import WebSocket
-from typing import List, Dict, Any
 
 
 class ConnectionManager:
-    """
-    Manages active WebSocket connections.
+    """Manages active WebSocket connections and client communication.
+
+    Provides mechanisms to accept new client connections, track active
+    sockets, send targeted single-client messages, and broadcast events
+    to all connected clients.
 
     Attributes:
-        active_connections (List[WebSocket]): A list of currently active
-            WebSocket connections.
+        active_connections (List[WebSocket]): A list of currently open and
+            active WebSocket client connections.
+
+    Example:
+        >>> manager = ConnectionManager()
+        >>> await manager.connect(websocket)
+        >>> await manager.broadcast({"event": "status", "data": "ready"})
     """
 
-    def __init__(self):
-        """Initialize an empty list of active connections."""
+    def __init__(self) -> None:
+        """Initializes an empty connection manager with no active clients."""
         self.active_connections: List[WebSocket] = []
 
-    async def connect(self, websocket: WebSocket):
-        """
-        Accept a new WebSocket connection and add it to the active list.
+    async def connect(self, websocket: WebSocket) -> None:
+        """Accepts a incoming WebSocket handshake and tracks the connection.
 
         Args:
-            websocket (WebSocket): The WebSocket instance to accept.
+            websocket (WebSocket): The raw FastAPI WebSocket instance.
         """
         await websocket.accept()
         self.active_connections.append(websocket)
 
-    def disconnect(self, websocket: WebSocket):
-        """
-        Remove a WebSocket connection from the active list.
+    def disconnect(self, websocket: WebSocket) -> None:
+        """Removes a WebSocket from the active connection pool.
 
         Args:
-            websocket (WebSocket): The WebSocket instance to remove.
+            websocket (WebSocket): The WebSocket connection instance.
 
         Raises:
-            ValueError: If the connection is not found in the active list.
+            ValueError: If connection is not found in the active pool.
         """
         self.active_connections.remove(websocket)
 
-    async def send_clara_message(self, message: Dict[str, Any], websocket: WebSocket):
-        """Send a message to a single client."""
-        await websocket.send_json(message)
-
-    async def broadcast(self, data: dict):
-        """
-        Send a JSON message to all active clients.
-
-        If sending to a client fails (e.g., due to a closed connection), the
-        client is marked for removal and will be disconnected after the loop.
+    async def send_clara_message(
+        self, message: Dict[str, Any], websocket: WebSocket
+    ) -> None:
+        """Sends a JSON-serialized message to a single specific client.
 
         Args:
-            data (dict): The JSON-serializable data to send to all clients.
+            message (Dict[str, Any]): Dictionary payload to transmit as JSON.
+            websocket (WebSocket): Target client WebSocket connection.
         """
-        dead_connections = []
+        await websocket.send_json(message)
+
+    async def broadcast(self, data: Dict[str, Any]) -> None:
+        """Broadcasts a JSON-serializable message to all active clients.
+
+        Automatically detects and prunes disconnected or broken client sockets
+        during broadcast iteration.
+
+        Args:
+            data (Dict[str, Any]): JSON payload to send to all active clients.
+        """
+        dead_connections: List[WebSocket] = []
         for connection in self.active_connections:
             try:
                 await connection.send_json(data=data)
@@ -67,7 +78,11 @@ class ConnectionManager:
                 dead_connections.append(connection)
 
         for conn in dead_connections:
-            self.disconnect(conn)
+            try:
+                self.disconnect(conn)
+            except ValueError:
+                pass
 
 
-manager = ConnectionManager()
+manager: ConnectionManager = ConnectionManager()
+"""Default global connection manager singleton."""

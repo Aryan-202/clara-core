@@ -7,10 +7,12 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
+   clara.agent
    clara.api
    clara.auth
    clara.conf
    clara.connections
+   clara.skills
 
 Submodules
 ----------

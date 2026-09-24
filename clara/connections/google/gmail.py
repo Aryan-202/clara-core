@@ -745,20 +745,39 @@ def delete_email(
 
 
 class GmailConnection(BaseConnection):
-    """
-    Clara Connection implementation for Google Gmail service.
+    """Clara connection adapter implementation for Google Gmail service.
+
+    Enables agents and workflows to search, read, draft, send, archive,
+    and delete emails via the Gmail v1 REST API.
+
+    Attributes:
+        name (str): Unique connection identifier ('gmail').
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
+        """Initializes a new Gmail connection instance.
+
+        Args:
+            config: Optional configuration dictionary.
+        """
         super().__init__(name="gmail", config=config)
 
     def connect(
         self,
         credentials: Optional[Credentials] = None,
         access_token: Optional[str] = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> Resource:
-        """Connect and initialize Gmail API client service."""
+        """Authenticates and initializes the Gmail API client service.
+
+        Args:
+            credentials: Optional Google OAuth2 Credentials object.
+            access_token: Optional OAuth2 access token.
+            **kwargs: Extra parameters passed to the service builder.
+
+        Returns:
+            Resource: Authenticated Gmail API client resource.
+        """
         token = access_token or self.config.get("access_token")
         self._service = _get_gmail_service(
             credentials=credentials,
@@ -769,34 +788,42 @@ class GmailConnection(BaseConnection):
         return self._service
 
     def disconnect(self) -> None:
-        """Disconnect and clear Gmail service client."""
+        """Disconnects and releases the active Gmail service client."""
         self._service = None
         self._is_connected = False
 
-    def send_email(self, *args, **kwargs) -> Dict[str, Any]:
+    def send_email(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        """Sends an email using the active Gmail service connection."""
         return send_email(*args, service=self.service, **kwargs)
 
-    def create_draft(self, *args, **kwargs) -> Dict[str, Any]:
+    def create_draft(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        """Creates a draft using the active Gmail service connection."""
         return create_draft(*args, service=self.service, **kwargs)
 
-    def update_draft(self, *args, **kwargs) -> Dict[str, Any]:
+    def update_draft(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        """Updates a draft using the active Gmail service connection."""
         return update_draft(*args, service=self.service, **kwargs)
 
-    def search_emails(self, *args, **kwargs) -> List[Dict[str, Any]]:
+    def search_emails(self, *args: Any, **kwargs: Any) -> List[Dict[str, Any]]:
+        """Searches messages using the active Gmail service connection."""
         return search_emails(*args, service=self.service, **kwargs)
 
-    def get_email_content(self, *args, **kwargs) -> Dict[str, Any]:
+    def get_email_content(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        """Retrieves email content using the active Gmail service connection."""
         return get_email_content(*args, service=self.service, **kwargs)
 
-    def summarize_thread(self, *args, **kwargs) -> Dict[str, Any]:
+    def summarize_thread(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        """Summarizes a message thread using the active Gmail service connection."""
         return summarize_thread(*args, service=self.service, **kwargs)
 
-    def move_email(self, *args, **kwargs) -> Dict[str, Any]:
+    def move_email(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        """Moves an email using the active Gmail service connection."""
         return move_email(*args, service=self.service, **kwargs)
 
-    def delete_email(self, *args, **kwargs) -> Dict[str, Any]:
+    def delete_email(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        """Trashes or permanently deletes an email using the active connection."""
         return delete_email(*args, service=self.service, **kwargs)
 
 
-# Register connection
+# Register connection in the global registry
 registry.register("gmail", GmailConnection)

@@ -1,30 +1,78 @@
-"""
-Connection registry for managing all external service connections in Clara.
+"""Connection Registry for Clara Service Integrations.
+
+This module provides the :class:`ConnectionRegistry` singleton and class
+to register, instantiate, and look up external service adapters dynamically
+at runtime.
 """
 
-from typing import Dict, Type, Optional
+from typing import Any, Dict, Optional, Type
 from clara.connections.base import BaseConnection
 
 
 class ConnectionRegistry:
-    """
-    Registry for managing available service connections.
+    """Manages active third-party API service integrations and adapters.
+
+    Maintains a catalog of registered connection classes and singleton active
+    instances for reuse across Clara skills and agent workflows.
+
+    Attributes:
+        _connections (Dict[str, Type[BaseConnection]]): Mapping of lowercased
+            connection identifiers to their connection classes.
+        _active_instances (Dict[str, BaseConnection]): Mapping of identifiers
+            to live, instantiated connection objects.
+
+    Example:
+        >>> registry = ConnectionRegistry()
+        >>> registry.register("gmail", GmailConnection)
+        >>> gmail_client = registry.get_instance("gmail")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initializes an empty connection registry."""
         self._connections: Dict[str, Type[BaseConnection]] = {}
         self._active_instances: Dict[str, BaseConnection] = {}
 
-    def register(self, name: str, connection_cls: Type[BaseConnection]) -> None:
-        """Register a connection class with a given name."""
+    def register(
+        self, name: str, connection_cls: Type[BaseConnection]
+    ) -> None:
+        """Registers a connection class under a unique identifier.
+
+        Args:
+            name (str): Identifier for the connection (e.g., 'gmail',
+                'calendar', 'drive').
+            connection_cls (Type[BaseConnection]): The class object
+                inheriting from :class:`~clara.connections.base.BaseConnection`.
+
+        Example:
+            >>> registry.register("gmail", GmailConnection)
+        """
         self._connections[name.lower()] = connection_cls
 
     def get(self, name: str) -> Optional[Type[BaseConnection]]:
-        """Retrieve a registered connection class by name."""
+        """Retrieves a registered connection class by its identifier.
+
+        Args:
+            name (str): Identifier for the connection.
+
+        Returns:
+            Optional[Type[BaseConnection]]: The connection class if
+            registered; otherwise None.
+        """
         return self._connections.get(name.lower())
 
-    def get_instance(self, name: str, **kwargs) -> Optional[BaseConnection]:
-        """Get or create an active instance of a connection."""
+    def get_instance(
+        self, name: str, **kwargs: Any
+    ) -> Optional[BaseConnection]:
+        """Gets an existing instance or instantiates and caches a connection.
+
+        Args:
+            name (str): Identifier for the connection.
+            **kwargs (Any): Keyword arguments passed to constructor.
+
+        Returns:
+            Optional[BaseConnection]: Active connection instance, or None
+            if not registered.
+        """
         name_key = name.lower()
         if name_key not in self._active_instances:
             conn_cls = self.get(name_key)
@@ -34,8 +82,14 @@ class ConnectionRegistry:
         return self._active_instances[name_key]
 
     def list_connections(self) -> Dict[str, Type[BaseConnection]]:
-        """Return all registered connection classes."""
+        """Returns a snapshot of all registered connection classes.
+
+        Returns:
+            Dict[str, Type[BaseConnection]]: Dictionary of names mapped
+            to classes.
+        """
         return dict(self._connections)
 
 
-registry = ConnectionRegistry()
+registry: ConnectionRegistry = ConnectionRegistry()
+"""Global default connection registry instance."""
