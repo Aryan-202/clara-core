@@ -55,12 +55,16 @@ def build_docs(strict: bool = False) -> int:
         print("Error: sphinx-build failed.", file=sys.stderr)
         return build_res.returncode
 
-    print(f"\nDocumentation built successfully! Open {build_dir / 'index.html'} to view.")
+    print(
+        f"\nDocumentation built successfully! Open {build_dir / 'index.html'} to view."
+    )
     return 0
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Build clara-core Sphinx documentation.")
+    parser = argparse.ArgumentParser(
+        description="Build clara-core Sphinx documentation."
+    )
     parser.add_argument(
         "-W",
         "--strict",

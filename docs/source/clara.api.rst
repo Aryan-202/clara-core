@@ -14,5 +14,5 @@ Module contents
 
 .. automodule:: clara.api
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
