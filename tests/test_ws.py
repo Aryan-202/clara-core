@@ -186,8 +186,10 @@ async def test_websocket_chat_endpoint_cleans_up_unexpected_errors(monkeypatch):
     manager.disconnect.assert_called_once_with(websocket)
 
 
-def test_websocket_chat_endpoint_processes_email_assistant_request(client, clean_connections, monkeypatch):
-    """Test receiving an email assistant prompt from an Android/mobile client over websocket."""
+def test_websocket_chat_endpoint_processes_email_assistant_request(
+    client, clean_connections, monkeypatch
+):
+    """Test receiving email prompt from mobile client over websocket."""
     from unittest.mock import MagicMock
     mock_workflow = MagicMock()
     mock_workflow.return_value = {
@@ -200,7 +202,9 @@ def test_websocket_chat_endpoint_processes_email_assistant_request(client, clean
 
     with client.websocket_connect("/ws/chat") as websocket:
         message = {
-            "message": "send email to user@example.com with subject Hi and body Hello",
+            "message": (
+                "send email to user@example.com with subject Hi and body Hello"
+            ),
             "access_token": "mock_google_token",
             "skill": "email_assistant",
         }
@@ -213,4 +217,3 @@ def test_websocket_chat_endpoint_processes_email_assistant_request(client, clean
         response = websocket.receive_json()
         assert response["type"] == "chat_response"
         assert "Success" in response["payload"]["reply"]
-

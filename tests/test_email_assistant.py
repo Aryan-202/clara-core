@@ -3,18 +3,16 @@ Unit tests for Email Assistant skill and workflows.
 """
 
 from unittest.mock import MagicMock, patch
-import pytest
 
-from clara.skills.email_assistant.workflows import (
-    EmailAssistantWorkflow,
-    handle_email_prompt,
-)
+from clara.skills.email_assistant.workflows import EmailAssistantWorkflow
 
 
 class TestEmailAssistantWorkflow:
     def test_send_email_missing_recipient(self):
         workflow = EmailAssistantWorkflow(service=MagicMock())
-        result = workflow.execute("send email with subject Meeting and body Hello")
+        result = workflow.execute(
+            "send email with subject Meeting and body Hello"
+        )
 
         assert result["status"] == "clarification_needed"
         assert result["action"] == "send_email"
@@ -22,7 +20,9 @@ class TestEmailAssistantWorkflow:
 
     def test_send_email_missing_body(self):
         workflow = EmailAssistantWorkflow(service=MagicMock())
-        result = workflow.execute("send email to test@example.com with subject Hi")
+        result = workflow.execute(
+            "send email to test@example.com with subject Hi"
+        )
 
         assert result["status"] == "clarification_needed"
         assert result["action"] == "send_email"
@@ -30,9 +30,18 @@ class TestEmailAssistantWorkflow:
 
     @patch("clara.skills.email_assistant.workflows.send_email")
     def test_send_email_success(self, mock_send):
-        mock_send.return_value = {"status": "sent", "id": "123", "to": ["test@example.com"], "subject": "Hi"}
+        mock_send.return_value = {
+            "status": "sent",
+            "id": "123",
+            "to": ["test@example.com"],
+            "subject": "Hi",
+        }
         workflow = EmailAssistantWorkflow(service=MagicMock())
-        result = workflow.execute('send email to test@example.com with subject "Project Update" saying "Everything looks good"')
+        prompt = (
+            'send email to test@example.com with subject "Project Update" '
+            'saying "Everything looks good"'
+        )
+        result = workflow.execute(prompt)
 
         assert result["status"] == "success"
         assert result["action"] == "send_email"
@@ -41,8 +50,8 @@ class TestEmailAssistantWorkflow:
     def test_send_email_bulk_guardrail(self):
         workflow = EmailAssistantWorkflow(service=MagicMock())
         prompt = (
-            "send email to u1@a.com, u2@a.com, u3@a.com, u4@a.com, u5@a.com, u6@a.com "
-            "with subject Bulk and body Hello all"
+            "send email to u1@a.com, u2@a.com, u3@a.com, u4@a.com, "
+            "u5@a.com, u6@a.com with subject Bulk and body Hello all"
         )
         result = workflow.execute(prompt)
 
@@ -52,9 +61,17 @@ class TestEmailAssistantWorkflow:
 
     @patch("clara.skills.email_assistant.workflows.create_draft")
     def test_create_draft(self, mock_draft):
-        mock_draft.return_value = {"status": "draft_created", "draft_id": "d123", "subject": "Meeting"}
+        mock_draft.return_value = {
+            "status": "draft_created",
+            "draft_id": "d123",
+            "subject": "Meeting",
+        }
         workflow = EmailAssistantWorkflow(service=MagicMock())
-        result = workflow.execute('draft email to boss@company.com with subject "Meeting" saying "Can we talk today?"')
+        prompt = (
+            'draft email to boss@company.com with subject "Meeting" '
+            'saying "Can we talk today?"'
+        )
+        result = workflow.execute(prompt)
 
         assert result["status"] == "success"
         assert result["action"] == "create_draft"
@@ -98,7 +115,9 @@ class TestEmailAssistantWorkflow:
 
     @patch("clara.skills.email_assistant.workflows.delete_email")
     def test_delete_email_trash(self, mock_delete):
-        mock_delete.return_value = {"status": "trashed", "message_id": "m1234567890"}
+        mock_delete.return_value = {
+            "status": "trashed", "message_id": "m1234567890"
+        }
         workflow = EmailAssistantWorkflow(service=MagicMock())
         result = workflow.execute("delete email message m1234567890")
 
@@ -108,14 +127,18 @@ class TestEmailAssistantWorkflow:
 
     def test_delete_email_permanent_confirmation_guardrail(self):
         workflow = EmailAssistantWorkflow(service=MagicMock())
-        result = workflow.execute("permanently delete email message m1234567890")
+        result = workflow.execute(
+            "permanently delete email message m1234567890"
+        )
 
         assert result["status"] == "pending_confirmation"
         assert "permanently delete" in result["reply"].lower()
 
     @patch("clara.skills.email_assistant.workflows.delete_email")
     def test_confirm_pending_delete(self, mock_delete):
-        mock_delete.return_value = {"status": "permanently_deleted", "message_id": "m1234567890"}
+        mock_delete.return_value = {
+            "status": "permanently_deleted", "message_id": "m1234567890"
+        }
         workflow = EmailAssistantWorkflow(service=MagicMock())
         context = {
             "pending_action": {

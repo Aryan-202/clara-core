@@ -2,11 +2,10 @@
 Unit tests for Gmail connection module and BaseConnection.
 """
 
+import base64
 from unittest.mock import MagicMock, patch
-import pytest
 
-from clara.connections.base import BaseConnection
-from clara.connections.registry import ConnectionRegistry, registry
+from clara.connections.registry import ConnectionRegistry
 from clara.connections.google.gmail import (
     GmailConnection,
     create_draft,
@@ -138,22 +137,28 @@ class TestGmailCRUDOperations:
                     {"name": "Subject", "value": "Test Sub"},
                     {"name": "From", "value": "sender@test.com"},
                     {"name": "To", "value": "me@test.com"},
-                    {"name": "Date", "value": "Thu, 24 Sep 2026 12:00:00 +0000"},
+                    {
+                        "name": "Date",
+                        "value": "Thu, 24 Sep 2026 12:00:00 +0000",
+                    },
                 ]
             },
         }
 
-        results = search_emails(query="meeting", folder="inbox", limit=5, service=mock_service)
+        results = search_emails(
+            query="meeting", folder="inbox", limit=5, service=mock_service
+        )
 
         assert len(results) == 2
         assert results[0]["subject"] == "Test Sub"
         assert results[0]["from"] == "sender@test.com"
 
     def test_get_email_content(self):
-        import base64
         mock_service = MagicMock()
         mock_messages = mock_service.users.return_value.messages.return_value
-        encoded_body = base64.urlsafe_b64encode(b"This is the email text body").decode("utf-8")
+        encoded_body = base64.urlsafe_b64encode(
+            b"This is the email text body"
+        ).decode("utf-8")
         mock_messages.get.return_value.execute.return_value = {
             "id": "msg123",
             "threadId": "th123",
@@ -162,7 +167,10 @@ class TestGmailCRUDOperations:
                     {"name": "Subject", "value": "Full Email"},
                     {"name": "From", "value": "sender@test.com"},
                     {"name": "To", "value": "receiver@test.com"},
-                    {"name": "Date", "value": "Thu, 24 Sep 2026 12:00:00 +0000"},
+                    {
+                        "name": "Date",
+                        "value": "Thu, 24 Sep 2026 12:00:00 +0000",
+                    },
                 ],
                 "mimeType": "text/plain",
                 "body": {"data": encoded_body},
@@ -175,9 +183,10 @@ class TestGmailCRUDOperations:
         assert "This is the email text body" in content["body"]
 
     def test_summarize_thread(self):
-        import base64
         mock_service = MagicMock()
-        encoded_body = base64.urlsafe_b64encode(b"Thread message 1").decode("utf-8")
+        encoded_body = base64.urlsafe_b64encode(
+            b"Thread message 1"
+        ).decode("utf-8")
         mock_threads = mock_service.users.return_value.threads.return_value
         mock_threads.get.return_value.execute.return_value = {
             "id": "th123",
@@ -188,7 +197,10 @@ class TestGmailCRUDOperations:
                         "headers": [
                             {"name": "Subject", "value": "Project Sync"},
                             {"name": "From", "value": "boss@test.com"},
-                            {"name": "Date", "value": "Thu, 24 Sep 2026 10:00:00 +0000"},
+                            {
+                                "name": "Date",
+                                "value": "Thu, 24 Sep 2026 10:00:00 +0000",
+                            },
                         ],
                         "mimeType": "text/plain",
                         "body": {"data": encoded_body},
@@ -210,7 +222,9 @@ class TestGmailCRUDOperations:
             "labelIds": [],
         }
 
-        result = move_email("msg123", target_folder="archive", service=mock_service)
+        result = move_email(
+            "msg123", target_folder="archive", service=mock_service
+        )
         assert result["status"] == "moved"
         assert result["target_folder"] == "archive"
 
@@ -219,11 +233,15 @@ class TestGmailCRUDOperations:
         mock_messages = mock_service.users.return_value.messages.return_value
 
         # Trash
-        res_trash = delete_email("msg123", permanent=False, service=mock_service)
+        res_trash = delete_email(
+            "msg123", permanent=False, service=mock_service
+        )
         assert res_trash["status"] == "trashed"
         mock_messages.trash.assert_called_once()
 
         # Permanent
-        res_perm = delete_email("msg123", permanent=True, service=mock_service)
+        res_perm = delete_email(
+            "msg123", permanent=True, service=mock_service
+        )
         assert res_perm["status"] == "permanently_deleted"
         mock_messages.delete.assert_called_once()
