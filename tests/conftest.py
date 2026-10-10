@@ -24,3 +24,4 @@ def clean_connections():
     yield
     # Clean up after test
     manager.active_connections.clear()
+
