@@ -26,7 +26,22 @@ GOOGLE_CLIENT_ID_ANDROID: str = os.getenv("GOOGLE_CLIENT_ID_ANDROID", "")
 
 GOOGLE_CLIENT_ID_IOS: str = os.getenv("GOOGLE_CLIENT_ID_IOS", "")
 """Google OAuth 2.0 Client ID for iOS client applications."""
+# Google OAuth Primary/Fallback Credentials
+GOOGLE_CLIENT_ID: str = (
+    os.getenv("GOOGLE_CLIENT_ID")
+    or GOOGLE_CLIENT_ID_WEB
+    or GOOGLE_CLIENT_ID_DESKTOP
+    or GOOGLE_CLIENT_ID_ANDROID
+    or ""
+)
+"""Primary or fallback Google OAuth 2.0 Client ID."""
 
+GOOGLE_CLIENT_SECRET: str = (
+    os.getenv("GOOGLE_CLIENT_SECRET")
+    or GOOGLE_CLIENT_SECRET_WEB
+    or ""
+)
+"""Primary or fallback Google OAuth 2.0 Client Secret."""
 # Google Auth URIs
 AUTH_URI: str = os.getenv(
     "AUTH_URI", "https://accounts.google.com/o/oauth2/auth"

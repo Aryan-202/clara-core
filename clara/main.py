@@ -6,19 +6,33 @@ routes, defines default health-check endpoints, and provides the CLI runner comm
 
 from typing import Dict
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from clara.api.ws.router import router as ws_router
+from clara.auth import auth_router
 
-clara: FastAPI = FastAPI(
+app: FastAPI = FastAPI(
     title="Clara Core API",
     description="Autonomous AI agent and personal workspace automation backend.",
     version="0.1.0",
 )
 """Root FastAPI application instance."""
 
-clara.include_router(ws_router)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+clara: FastAPI = app
+"""Alias for backwards compatibility with existing clara imports and scripts."""
+
+app.include_router(ws_router)
+app.include_router(auth_router)
 
 
-@clara.get("/")
+@app.get("/")
 async def root() -> Dict[str, str]:
     """Health-check and service status endpoint.
 
@@ -37,7 +51,7 @@ def main() -> None:
         $ clara
     """
     import uvicorn
-    uvicorn.run("clara.main:clara", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("clara.main:app", host="0.0.0.0", port=8000, reload=True)
 
 
 if __name__ == "__main__":

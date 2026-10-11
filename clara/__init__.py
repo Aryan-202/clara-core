@@ -5,10 +5,10 @@ including email management, calendar scheduling, file discovery, and real-time
 agent chat interfaces.
 """
 
-from clara.main import clara, main
+from clara.main import app, clara, main
 
 __all__ = [
+    "app",
     "clara",
     "main",
 ]
-

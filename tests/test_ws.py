@@ -248,3 +248,113 @@ def test_websocket_chat_endpoint_processes_gmail_assistant_request(
         response = websocket.receive_json()
         assert response["type"] == "chat_response"
         assert "Gmail Assistant" in response["payload"]["reply"]
+
+
+def test_websocket_ws_root_endpoint_connects_and_echos(
+    client, clean_connections
+):
+    """Test connecting to the root /ws endpoint used by Android clients."""
+    with client.websocket_connect("/ws") as websocket:
+        message = {"message": "hello"}
+        websocket.send_json(message)
+
+        assert websocket.receive_json() == {
+            "status": "received",
+            "echo": message,
+        }
+        assert websocket.receive_json() == {
+            "type": "chat_response",
+            "payload": {"reply": "Hello!"},
+        }
+
+
+def test_websocket_handshake_query_token_injected(
+    client, clean_connections, monkeypatch
+):
+    """Test query token passed during handshake is injected into prompt handler."""
+    from unittest.mock import MagicMock
+    mock_workflow = MagicMock()
+    mock_workflow.return_value = {
+        "status": "success",
+        "action": "send_email",
+        "reply": "**Success:** Sent.",
+    }
+    router_mod = importlib.import_module("clara.api.ws.router")
+    monkeypatch.setattr(router_mod, "handle_email_prompt", mock_workflow)
+
+    with client.websocket_connect("/ws?token=handshake_jwt_token") as websocket:
+        message = {"message": "send email to user@test.com saying Hi"}
+        websocket.send_json(message)
+
+        websocket.receive_json()  # echo
+        websocket.receive_json()  # chat_response
+
+        mock_workflow.assert_called_once()
+        _, kwargs = mock_workflow.call_args
+        assert kwargs["access_token"] == "handshake_jwt_token"
+
+
+def test_http_post_api_chat_endpoint_hello(client):
+    """Test HTTP POST /api/chat fallback endpoint with greeting."""
+    resp = client.post("/api/chat", json={"message": "hello"})
+    assert resp.status_code == 200
+    assert resp.json() == {"reply": "Hello!"}
+
+
+def test_http_post_chat_alias_endpoint(client):
+    """Test HTTP POST /chat alias endpoint."""
+    resp = client.post("/chat", json={"message": "hello"})
+    assert resp.status_code == 200
+    assert resp.json() == {"reply": "Hello!"}
+
+
+def test_http_post_api_chat_processes_email_request(client, monkeypatch):
+    """Test HTTP POST /api/chat delegating to email workflow."""
+    from unittest.mock import MagicMock
+    mock_workflow = MagicMock()
+    mock_workflow.return_value = {
+        "status": "success",
+        "action": "send_email",
+        "reply": "**Success:** Sent email via REST.",
+    }
+    router_mod = importlib.import_module("clara.api.ws.router")
+    monkeypatch.setattr(router_mod, "handle_email_prompt", mock_workflow)
+
+    resp = client.post(
+        "/api/chat",
+        json={
+            "message": "send email to friend@test.com",
+            "access_token": "token123",
+            "skill": "gmail_assistant",
+        },
+    )
+    assert resp.status_code == 200
+    assert "Sent email via REST" in resp.json()["reply"]
+
+
+def test_http_post_api_chat_openrouter_completion(client, monkeypatch):
+    """Test HTTP POST /api/chat delegating to OpenRouter client."""
+    from unittest.mock import MagicMock
+    from clara.agent.open_router import ModelResponse
+
+    mock_client = MagicMock()
+    mock_client.generate_completion.return_value = ModelResponse(
+        content="AI stands for Artificial Intelligence.",
+        model="openai/gpt-4o",
+        raw_response={"id": "or-123"},
+    )
+    router_mod = importlib.import_module("clara.api.ws.router")
+    monkeypatch.setattr(router_mod, "OpenRouterClient", lambda **kw: mock_client)
+
+    resp = client.post(
+        "/api/chat",
+        json={
+            "message": "What is AI?",
+            "openrouter_key": "sk-or-test-key",
+            "model": "openai/gpt-4o",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["reply"] == "AI stands for Artificial Intelligence."
+

@@ -13,14 +13,91 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import Resource, build
 
-from clara.conf.google_client_conf import CALENDAR_SCOPES
+from clara.conf.google_client_conf import (
+    CALENDAR_SCOPES,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    TOKEN_URI,
+)
 from clara.connections.base import BaseConnection
 from clara.connections.registry import registry
+
+
+def _can_refresh(creds: Credentials) -> bool:
+    """Check if credentials have all fields required for refresh."""
+    return bool(
+        creds.refresh_token
+        and creds.token_uri
+        and creds.client_id
+        and creds.client_secret
+    )
+
+
+def _build_credentials(
+    token: Optional[str],
+    refresh_token: Optional[str],
+    token_uri: str,
+    client_id: str,
+    client_secret: str,
+    scopes: List[str],
+) -> Credentials:
+    """Build and refresh credentials if needed."""
+    creds = Credentials(
+        token=token,
+        refresh_token=refresh_token,
+        token_uri=token_uri,
+        client_id=client_id or None,
+        client_secret=client_secret or None,
+        scopes=scopes,
+    )
+    if not creds.valid and _can_refresh(creds):
+        try:
+            creds.refresh(Request())
+        except Exception:
+            pass
+    return creds
+
+
+def _load_stored_credentials(
+    token_path: str,
+    client_secrets_file: str,
+    scopes: List[str],
+    client_id: str,
+    client_secret: str,
+    token_uri: str,
+) -> Optional[Credentials]:
+    """Load credentials from disk or run local auth flow."""
+    creds = None
+    if os.path.exists(token_path):
+        creds = Credentials.from_authorized_user_file(token_path, scopes=scopes)
+        if creds:
+            if not getattr(creds, "client_id", None) and client_id:
+                creds._client_id = client_id
+            if not getattr(creds, "client_secret", None) and client_secret:
+                creds._client_secret = client_secret
+            if not getattr(creds, "token_uri", None) and token_uri:
+                creds._token_uri = token_uri
+
+    if not creds or not creds.valid:
+        if creds and creds.expired and _can_refresh(creds):
+            creds.refresh(Request())
+        elif os.path.exists(client_secrets_file):
+            flow = InstalledAppFlow.from_client_secrets_file(
+                client_secrets_file, scopes
+            )
+            creds = flow.run_local_server(port=0)
+            with open(token_path, "w", encoding="utf-8") as tf:
+                tf.write(creds.to_json())
+    return creds
 
 
 def _get_calendar_service(
     credentials: Optional[Credentials] = None,
     access_token: Optional[str] = None,
+    refresh_token: Optional[str] = None,
+    client_id: Optional[str] = None,
+    client_secret: Optional[str] = None,
+    token_uri: Optional[str] = None,
     token_path: str = "token.json",
     client_secrets_file: str = "credentials.json",
 ) -> Resource:
@@ -29,37 +106,39 @@ def _get_calendar_service(
     Args:
         credentials: An existing Google OAuth2 Credentials object.
         access_token: An OAuth2 bearer token string.
+        refresh_token: An OAuth2 refresh token string.
+        client_id: Optional OAuth client ID override.
+        client_secret: Optional OAuth client secret override.
+        token_uri: Optional OAuth token endpoint URI.
         token_path: Path to stored credentials file.
         client_secrets_file: Path to client_secrets.json for interactive OAuth.
 
     Returns:
         Resource: Authenticated Google Calendar v3 API client.
     """
+    c_id = client_id or GOOGLE_CLIENT_ID
+    c_sec = client_secret or GOOGLE_CLIENT_SECRET
+    t_uri = token_uri or TOKEN_URI
+
     if credentials is not None:
+        if credentials.expired and _can_refresh(credentials):
+            try:
+                credentials.refresh(Request())
+            except Exception:
+                pass
         return build("calendar", "v3", credentials=credentials)
 
-    if access_token:
-        creds = Credentials(token=access_token, scopes=CALENDAR_SCOPES)
+    if access_token or refresh_token:
+        creds = _build_credentials(
+            access_token, refresh_token, t_uri, c_id, c_sec, CALENDAR_SCOPES
+        )
         return build("calendar", "v3", credentials=creds)
 
-    creds = None
-    if os.path.exists(token_path):
-        creds = Credentials.from_authorized_user_file(
-            token_path, scopes=CALENDAR_SCOPES
-        )
-
+    creds = _load_stored_credentials(
+        token_path, client_secrets_file, CALENDAR_SCOPES, c_id, c_sec, t_uri
+    )
     if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(request=Request())
-        elif os.path.exists(client_secrets_file):
-            flow = InstalledAppFlow.from_client_secrets_file(
-                client_secrets_file, CALENDAR_SCOPES
-            )
-            creds = flow.run_local_server(port=0)
-            with open(token_path, "w", encoding="utf-8") as token_file:
-                token_file.write(creds.to_json())
-        else:
-            return build("calendar", "v3", developerKey="")
+        return build("calendar", "v3", developerKey="")
 
     return build("calendar", "v3", credentials=creds)
 
@@ -234,6 +313,7 @@ class CalendarConnection(BaseConnection):
         self,
         credentials: Optional[Credentials] = None,
         access_token: Optional[str] = None,
+        refresh_token: Optional[str] = None,
         **kwargs: Any,
     ) -> Resource:
         """Initializes and authenticates the Google Calendar API client.
@@ -241,15 +321,24 @@ class CalendarConnection(BaseConnection):
         Args:
             credentials: Optional OAuth2 Credentials instance.
             access_token: Optional OAuth2 access token.
+            refresh_token: Optional OAuth2 refresh token.
             **kwargs: Extra parameters passed to the internal service builder.
 
         Returns:
             Resource: The active Google Calendar Resource instance.
         """
         token = access_token or self.config.get("access_token")
+        r_token = refresh_token or self.config.get("refresh_token")
+        c_id = kwargs.pop("client_id", self.config.get("client_id"))
+        c_sec = kwargs.pop("client_secret", self.config.get("client_secret"))
+        t_uri = kwargs.pop("token_uri", self.config.get("token_uri"))
         self._service = _get_calendar_service(
             credentials=credentials,
             access_token=token,
+            refresh_token=r_token,
+            client_id=c_id,
+            client_secret=c_sec,
+            token_uri=t_uri,
             **kwargs,
         )
         self._is_connected = True

@@ -29,6 +29,26 @@ class TestEmailAssistantWorkflow:
         assert "body" in result["reply"].lower()
 
     @patch("clara.skills.email_assistant.workflows.send_email")
+    def test_send_email_auto_generates_body_for_topic(self, mock_send):
+        mock_send.return_value = {
+            "status": "sent",
+            "id": "123",
+            "to": ["manager@example.com"],
+            "subject": "Project status update",
+        }
+        workflow = EmailAssistantWorkflow(service=MagicMock())
+        result = workflow.execute(
+            "send email to manager@example.com about project status update"
+        )
+
+        assert result["status"] == "success"
+        assert result["action"] == "send_email"
+        assert "Email sent to manager@example.com" in result["reply"]
+        mock_send.assert_called_once()
+        _, kwargs = mock_send.call_args
+        assert "project status update" in kwargs["body"].lower()
+
+    @patch("clara.skills.email_assistant.workflows.send_email")
     def test_send_email_success(self, mock_send):
         mock_send.return_value = {
             "status": "sent",

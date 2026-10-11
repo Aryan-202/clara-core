@@ -45,17 +45,31 @@ class EmailAssistantWorkflow:
         self,
         service: Optional[Any] = None,
         access_token: Optional[str] = None,
+        refresh_token: Optional[str] = None,
+        client_id: Optional[str] = None,
+        client_secret: Optional[str] = None,
     ) -> None:
         """Initializes the EmailAssistantWorkflow.
 
         Args:
             service (Optional[Any]): Optional pre-initialized Gmail API service.
             access_token (Optional[str]): Optional OAuth2 access token string.
+            refresh_token (Optional[str]): Optional OAuth2 refresh token string.
+            client_id (Optional[str]): Optional OAuth client ID override.
+            client_secret (Optional[str]): Optional OAuth client secret override.
         """
         self.service: Optional[Any] = service
         self.access_token: Optional[str] = access_token
-        if not self.service and self.access_token:
-            self.service = _get_gmail_service(access_token=self.access_token)
+        self.refresh_token: Optional[str] = refresh_token
+        self.client_id: Optional[str] = client_id
+        self.client_secret: Optional[str] = client_secret
+        if not self.service and (self.access_token or self.refresh_token):
+            self.service = _get_gmail_service(
+                access_token=self.access_token,
+                refresh_token=self.refresh_token,
+                client_id=self.client_id,
+                client_secret=self.client_secret,
+            )
 
     def _ensure_service(self) -> Any:
         """Ensures that the Gmail API service instance is initialized.
@@ -64,7 +78,12 @@ class EmailAssistantWorkflow:
             Any: The authenticated Gmail service instance.
         """
         if not self.service:
-            self.service = _get_gmail_service(access_token=self.access_token)
+            self.service = _get_gmail_service(
+                access_token=self.access_token,
+                refresh_token=self.refresh_token,
+                client_id=self.client_id,
+                client_secret=self.client_secret,
+            )
         return self.service
 
     def execute(
@@ -358,15 +377,39 @@ class EmailAssistantWorkflow:
             }
 
         if not body:
-            recips = ", ".join(emails)
-            return {
-                "status": "clarification_needed",
-                "action": "send_email",
-                "reply": f"What would you like the body to {recips} to say?",
-                "data": {
-                    "missing_field": "body", "to": emails, "subject": subject
-                },
-            }
+            topic_match = re.search(
+                r"(?:about|regarding|telling (?:them|him|her)|"
+                r"asking (?:them|him|her)|notifying (?:them|him|her)|"
+                r"to discuss)\s+(.+)",
+                prompt,
+                re.IGNORECASE,
+            )
+            if topic_match:
+                topic = topic_match.group(1).strip()
+                topic = re.sub(
+                    r"\bwith subject\b.*", "", topic, flags=re.IGNORECASE
+                ).strip()
+                if not subject or subject == "No Subject":
+                    subject = topic.capitalize()
+                body = (
+                    f"Hi,\n\nI am writing regarding {topic}.\n\n"
+                    "Please let me know if you have any questions or feedback.\n\n"
+                    "Best regards,"
+                )
+            else:
+                recips = ", ".join(emails)
+                return {
+                    "status": "clarification_needed",
+                    "action": "send_email",
+                    "reply": (
+                        f"What would you like the body to {recips} to say?"
+                    ),
+                    "data": {
+                        "missing_field": "body",
+                        "to": emails,
+                        "subject": subject,
+                    },
+                }
 
         if not subject:
             subject = "No Subject"
@@ -843,6 +886,9 @@ def handle_email_prompt(
     access_token: Optional[str] = None,
     service: Optional[Any] = None,
     context: Optional[Dict[str, Any]] = None,
+    refresh_token: Optional[str] = None,
+    client_id: Optional[str] = None,
+    client_secret: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Convenience helper to process a natural language prompt with the Email Assistant.
 
@@ -851,6 +897,9 @@ def handle_email_prompt(
         access_token (Optional[str]): Optional OAuth2 bearer token.
         service (Optional[Any]): Optional pre-authenticated Gmail API client.
         context (Optional[Dict[str, Any]]): Optional execution context.
+        refresh_token (Optional[str]): Optional OAuth2 refresh token.
+        client_id (Optional[str]): Optional OAuth client ID override.
+        client_secret (Optional[str]): Optional OAuth client secret override.
 
     Returns:
         Dict[str, Any]: Formatted execution results dictionary.
@@ -860,6 +909,10 @@ def handle_email_prompt(
         >>> print(res["reply"])
     """
     workflow = EmailAssistantWorkflow(
-        service=service, access_token=access_token
+        service=service,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        client_id=client_id,
+        client_secret=client_secret,
     )
     return workflow.execute(user_prompt=user_prompt, context=context)
