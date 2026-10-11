@@ -248,4 +248,3 @@ def test_websocket_chat_endpoint_processes_gmail_assistant_request(
         response = websocket.receive_json()
         assert response["type"] == "chat_response"
         assert "Gmail Assistant" in response["payload"]["reply"]
-
