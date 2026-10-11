@@ -9,7 +9,12 @@ from clara.skills.email_assistant.workflows import (
     handle_email_prompt,
 )
 
+GmailAssistantWorkflow = EmailAssistantWorkflow
+handle_gmail_prompt = handle_email_prompt
+
 __all__ = [
     "EmailAssistantWorkflow",
+    "GmailAssistantWorkflow",
     "handle_email_prompt",
+    "handle_gmail_prompt",
 ]

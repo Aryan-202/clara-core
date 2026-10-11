@@ -14,7 +14,7 @@ from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -153,7 +153,7 @@ def _build_mime_message(
     return message
 
 
-def _extract_body_from_payload(payload: Dict[str, Any]) -> tuple[str, str]:
+def _extract_body_from_payload(payload: Dict[str, Any]) -> Tuple[str, str]:
     """Extract plain text and html bodies recursively from Gmail payload."""
     plain_text = ""
     html_text = ""
@@ -385,7 +385,9 @@ def _resolve_folder_query(folder: str) -> str:
     return f"label:{folder}"
 
 
-def _resolve_date_query(date_range: Union[datetime, str, tuple, list]) -> str:
+def _resolve_date_query(
+    date_range: Union[datetime, str, Tuple[Any, ...], List[Any]]
+) -> str:
     """Map date range parameter to Gmail search syntax."""
     if isinstance(date_range, datetime):
         return f"after:{date_range.strftime('%Y/%m/%d')}"
@@ -403,7 +405,7 @@ def _resolve_date_query(date_range: Union[datetime, str, tuple, list]) -> str:
 def _build_search_query(
     query: str = "",
     folder: Optional[str] = None,
-    date_range: Optional[Union[datetime, str, tuple, list]] = None,
+    date_range: Optional[Union[datetime, str, Tuple[Any, ...], List[Any]]] = None,
 ) -> str:
     """Construct Gmail search query string from parameters."""
     query_parts = []
@@ -419,7 +421,7 @@ def _build_search_query(
 def search_emails(
     query: str = "",
     folder: Optional[str] = None,
-    date_range: Optional[Union[datetime, str, tuple]] = None,
+    date_range: Optional[Union[datetime, str, Tuple[Any, ...]]] = None,
     limit: int = 10,
     service: Optional[Any] = None,
 ) -> List[Dict[str, Any]]:
@@ -827,3 +829,4 @@ class GmailConnection(BaseConnection):
 
 # Register connection in the global registry
 registry.register("gmail", GmailConnection)
+registry.register("gmail_assistant", GmailConnection)

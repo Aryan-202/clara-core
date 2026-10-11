@@ -186,19 +186,19 @@ class EmailAssistantWorkflow:
         if any(w in p for w in send_kw):
             return "SEND_EMAIL"
 
-        read_kw = [
-            "read email", "open email", "view email",
-            "get email", "show email content"
-        ]
-        if any(w in p for w in read_kw):
-            return "READ_EMAIL"
-
         search_kw = [
             "search email", "find email", "check email",
             "check inbox", "unread emails", "list emails", "my emails"
         ]
         if any(w in p for w in search_kw):
             return "SEARCH_EMAILS"
+
+        read_kw = [
+            r"\bread email\b", r"\bopen email\b", r"\bview email\b",
+            r"\bget email\b", r"\bshow email content\b"
+        ]
+        if any(re.search(w, p) for w in read_kw):
+            return "READ_EMAIL"
 
         return self._parse_intent_fallback(p)
 
@@ -217,10 +217,10 @@ class EmailAssistantWorkflow:
             return "CREATE_DRAFT"
         if "send" in p:
             return "SEND_EMAIL"
-        if "read" in p or "content" in p:
-            return "READ_EMAIL"
-        if any(k in p for k in ["search", "find", "inbox", "emails"]):
+        if any(k in p for k in ["search", "find", "inbox", "emails", "unread"]):
             return "SEARCH_EMAILS"
+        if re.search(r"\bread\b", p) or "content" in p:
+            return "READ_EMAIL"
         return "UNKNOWN"
 
     def _is_confirmation(self, text: str) -> bool:
@@ -261,7 +261,8 @@ class EmailAssistantWorkflow:
             List[str]: List of valid email addresses detected.
         """
         email_pattern = r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+"
-        return re.findall(email_pattern, text)
+        matches = re.findall(email_pattern, text)
+        return [e.rstrip(".") for e in matches]
 
     def _extract_quoted_or_pattern(
         self, text: str, label: str
@@ -302,11 +303,23 @@ class EmailAssistantWorkflow:
             or ctx.get("body", "")
         )
 
+        if not subject:
+            subj_match = re.search(
+                r"(?:with\s+)?subject\s*[:=]?\s*(?:\"([^\"]*)\"|([a-zA-Z0-9_-]+))",
+                prompt,
+                re.IGNORECASE,
+            )
+            if subj_match:
+                subject = subj_match.group(1) or subj_match.group(2)
+
         quotes = re.findall(r'"([^"]*)"', prompt)
-        if not subject and len(quotes) >= 1:
+        if subject and not body and quotes:
+            body = quotes[-1]
+        elif not subject and len(quotes) >= 2:
             subject = quotes[0]
-        if not body and len(quotes) >= 2:
             body = quotes[1]
+        elif not subject and len(quotes) == 1:
+            subject = quotes[0]
         elif not body and not quotes:
             body_match = re.search(
                 r"(?:saying|that says|with text|body)\s+(.+)",
@@ -466,6 +479,10 @@ class EmailAssistantWorkflow:
         draft_id = (
             draft_id_match.group(1) if draft_id_match else ctx.get("draft_id")
         )
+        if draft_id and draft_id.lower() in [
+            "with", "body", "to", "for", "subject", "and", "saying", "content"
+        ]:
+            draft_id = ctx.get("draft_id")
 
         if not draft_id:
             return {

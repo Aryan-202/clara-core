@@ -164,3 +164,146 @@ class TestEmailAssistantWorkflow:
 
         assert result["status"] == "cancelled"
         assert "Cancelled" in result["reply"]
+
+    @patch("clara.skills.email_assistant.workflows.update_draft")
+    def test_update_draft_success(self, mock_update):
+        mock_update.return_value = {
+            "status": "draft_updated",
+            "draft_id": "d123",
+            "subject": "Updated Subject",
+        }
+        workflow = EmailAssistantWorkflow(service=MagicMock())
+        prompt = 'update draft id d123 with body "Updated meeting notes"'
+        result = workflow.execute(prompt)
+
+        assert result["status"] == "success"
+        assert result["action"] == "update_draft"
+        assert "d123" in result["reply"]
+
+    def test_update_draft_missing_draft_id(self):
+        workflow = EmailAssistantWorkflow(service=MagicMock())
+        result = workflow.execute("update draft with body new text")
+
+        assert result["status"] == "clarification_needed"
+        assert result["action"] == "update_draft"
+        assert "draft id" in result["reply"].lower()
+
+    @patch("clara.skills.email_assistant.workflows.summarize_thread")
+    def test_summarize_thread_success(self, mock_summarize):
+        mock_summarize.return_value = {
+            "thread_id": "t1234567890",
+            "subject": "Q3 Planning",
+            "message_count": 3,
+            "participants": ["alice@corp.com", "bob@corp.com"],
+            "formatted_thread": "Message 1\nMessage 2\nMessage 3",
+        }
+        workflow = EmailAssistantWorkflow(service=MagicMock())
+        result = workflow.execute("summarize thread id t1234567890")
+
+        assert result["status"] == "success"
+        assert result["action"] == "summarize_thread"
+        assert "Q3 Planning" in result["reply"]
+        assert "alice@corp.com" in result["reply"]
+
+    def test_summarize_thread_missing_id(self):
+        workflow = EmailAssistantWorkflow(service=MagicMock())
+        result = workflow.execute("summarize thread")
+
+        assert result["status"] == "clarification_needed"
+        assert result["action"] == "summarize_thread"
+        assert "thread/message id" in result["reply"].lower()
+
+    @patch("clara.skills.email_assistant.workflows.move_email")
+    def test_move_email_archive(self, mock_move):
+        mock_move.return_value = {
+            "status": "moved",
+            "message_id": "m1234567890",
+            "target_folder": "archive",
+        }
+        workflow = EmailAssistantWorkflow(service=MagicMock())
+        result = workflow.execute("archive email id m1234567890")
+
+        assert result["status"] == "success"
+        assert result["action"] == "move_email"
+        assert "archive" in result["reply"].lower()
+
+    def test_move_email_missing_id(self):
+        workflow = EmailAssistantWorkflow(service=MagicMock())
+        result = workflow.execute("archive email")
+
+        assert result["status"] == "clarification_needed"
+        assert result["action"] == "move_email"
+
+    @patch("clara.skills.email_assistant.workflows.send_email")
+    def test_confirm_pending_send(self, mock_send):
+        mock_send.return_value = {
+            "status": "sent",
+            "id": "123",
+            "to": ["user1@a.com", "user2@a.com"],
+            "subject": "Important Announcement",
+        }
+        workflow = EmailAssistantWorkflow(service=MagicMock())
+        context = {
+            "pending_action": {
+                "name": "send_email",
+                "to": ["user1@a.com", "user2@a.com"],
+                "subject": "Important Announcement",
+                "body": "Hello team",
+            }
+        }
+        result = workflow.execute("yes", context=context)
+
+        assert result["status"] == "success"
+        assert result["action"] == "send_email"
+        assert "Email sent to user1@a.com, user2@a.com" in result["reply"]
+
+    def test_fallback_intent(self):
+        workflow = EmailAssistantWorkflow(service=MagicMock())
+        result = workflow.execute("what is the weather today")
+
+        assert result["status"] == "clarification_needed"
+        assert "Email Assistant" in result["reply"]
+
+    @patch("clara.skills.email_assistant.workflows.send_email")
+    def test_error_handling(self, mock_send):
+        mock_send.side_effect = RuntimeError("Gmail API rate limit exceeded")
+        workflow = EmailAssistantWorkflow(service=MagicMock())
+        result = workflow.execute(
+            'send email to test@example.com with subject Hi body "Test"'
+        )
+
+        assert result["status"] == "error"
+        assert "rate limit exceeded" in result["reply"]
+
+
+class TestGmailAssistantAliases:
+    """Test Gmail Assistant aliases and convenience helpers."""
+
+    def test_aliases_export(self):
+        from clara.skills import (
+            EmailAssistantWorkflow as EAWorkflow,
+            GmailAssistantWorkflow as GAWorkflow,
+            handle_email_prompt,
+            handle_gmail_prompt,
+        )
+        from clara.skills.gmail_assistant import (
+            GmailAssistantWorkflow as DirectGAWorkflow,
+            handle_gmail_prompt as direct_handle_gmail,
+        )
+
+        assert GAWorkflow is EAWorkflow
+        assert DirectGAWorkflow is EAWorkflow
+        assert handle_gmail_prompt is handle_email_prompt
+        assert direct_handle_gmail is handle_email_prompt
+
+    @patch("clara.skills.email_assistant.workflows.search_emails")
+    def test_handle_email_prompt_convenience(self, mock_search):
+        mock_search.return_value = []
+        from clara.skills import handle_gmail_prompt
+
+        res = handle_gmail_prompt(
+            user_prompt="check unread emails",
+            service=MagicMock(),
+        )
+        assert res["status"] == "success"
+        assert res["action"] == "search_emails"

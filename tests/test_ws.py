@@ -217,3 +217,35 @@ def test_websocket_chat_endpoint_processes_email_assistant_request(
         response = websocket.receive_json()
         assert response["type"] == "chat_response"
         assert "Success" in response["payload"]["reply"]
+
+
+def test_websocket_chat_endpoint_processes_gmail_assistant_request(
+    client, clean_connections, monkeypatch
+):
+    """Test receiving gmail assistant prompt from mobile client over websocket."""
+    from unittest.mock import MagicMock
+    mock_workflow = MagicMock()
+    mock_workflow.return_value = {
+        "status": "success",
+        "action": "send_email",
+        "reply": "**Success:** Email sent via Gmail Assistant.",
+    }
+    router_mod = importlib.import_module("clara.api.ws.router")
+    monkeypatch.setattr(router_mod, "handle_email_prompt", mock_workflow)
+
+    with client.websocket_connect("/ws/chat") as websocket:
+        message = {
+            "message": "check inbox",
+            "access_token": "mock_google_token",
+            "skill": "gmail_assistant",
+        }
+        websocket.send_json(message)
+
+        assert websocket.receive_json() == {
+            "status": "received",
+            "echo": message,
+        }
+        response = websocket.receive_json()
+        assert response["type"] == "chat_response"
+        assert "Gmail Assistant" in response["payload"]["reply"]
+

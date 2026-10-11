@@ -5,10 +5,12 @@ This package manages integrations with external services such as Google Workspac
 """
 
 from clara.connections.base import BaseConnection
+from clara.connections.google.gmail import GmailConnection
 from clara.connections.registry import ConnectionRegistry, registry
 
 __all__ = [
     "BaseConnection",
     "ConnectionRegistry",
+    "GmailConnection",
     "registry",
 ]

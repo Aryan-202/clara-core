@@ -68,7 +68,10 @@ def _process_chat_data(data: Any) -> Dict[str, Any]:
         "unread", "sent", "trash", "archive",
     ]
     has_email_keyword = any(k in prompt_lower for k in email_keywords)
-    if skill == "email_assistant" or has_email_keyword:
+    if (
+        skill in ["email_assistant", "gmail_assistant", "gmail"]
+        or has_email_keyword
+    ):
         result = handle_email_prompt(
             user_prompt=user_prompt,
             access_token=access_token,
